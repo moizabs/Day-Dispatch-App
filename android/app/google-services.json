@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "625358424286",
+    "project_id": "daydispatch-4e285",
+    "storage_bucket": "daydispatch-4e285.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:625358424286:android:0a875845d1476b8a27da4f",
+        "android_client_info": {
+          "package_name": "com.daydispatch.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqpU1hSxsSsXT0ib8_k6uEFgOSC2lTMMQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:625358424286:android:09940af548d5624427da4f",
+        "android_client_info": {
+          "package_name": "com.daydispatch.example.daydispatch"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqpU1hSxsSsXT0ib8_k6uEFgOSC2lTMMQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
