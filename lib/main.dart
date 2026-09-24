@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'firebase_options.dart';
 import 'notification_service.dart';
 
@@ -45,11 +48,31 @@ class _DayDispatchAppState extends State<DayDispatchApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_requestInitialPermissions());
+    });
     _startupTimer = Timer(const Duration(milliseconds: 3600), () {
       if (mounted) {
         setState(() => _showSplash = false);
       }
     });
+  }
+
+  Future<void> _requestInitialPermissions() async {
+    try {
+      final permissions = <Permission>[
+        Permission.notification,
+        Permission.camera,
+        Permission.photos,
+        Permission.videos,
+        Permission.storage,
+        Permission.microphone,
+      ];
+      final statuses = await permissions.request();
+      debugPrint('Initial permissions statuses: $statuses');
+    } catch (error) {
+      debugPrint('Initial permissions request error: $error');
+    }
   }
 
   @override
@@ -71,7 +94,7 @@ class _DayDispatchAppState extends State<DayDispatchApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp( 
       title: 'DayDispatch',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -451,6 +474,11 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
         ),
       );
 
+    if (_controller.platform is AndroidWebViewController) {
+      (_controller.platform as AndroidWebViewController)
+          .setOnShowFileSelector(_androidFilePicker);
+    }
+
     _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
       results,
     ) {
@@ -479,6 +507,43 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
     } on MissingPluginException {
       // Non-Android platforms use the Firebase Messaging Dart callbacks.
     }
+  }
+
+  Future<List<String>> _androidFilePicker(FileSelectorParams params) async {
+    try {
+      final allowMultiple = params.mode == FileSelectorMode.openMultiple;
+
+      FileType fileType = FileType.any;
+      final acceptTypes = params.acceptTypes;
+      if (acceptTypes.isNotEmpty) {
+        final isOnlyImage = acceptTypes.every((t) => t.startsWith('image/'));
+        final isOnlyVideo = acceptTypes.every((t) => t.startsWith('video/'));
+        final isOnlyAudio = acceptTypes.every((t) => t.startsWith('audio/'));
+        if (isOnlyImage) {
+          fileType = FileType.image;
+        } else if (isOnlyVideo) {
+          fileType = FileType.video;
+        } else if (isOnlyAudio) {
+          fileType = FileType.audio;
+        }
+      }
+
+      if (allowMultiple) {
+        final files = await FilePicker.pickFiles(type: fileType);
+        return files
+            .where((file) => file.path != null)
+            .map((file) => Uri.file(file.path!).toString())
+            .toList();
+      } else {
+        final file = await FilePicker.pickFile(type: fileType);
+        if (file?.path != null) {
+          return [Uri.file(file!.path!).toString()];
+        }
+      }
+    } catch (error) {
+      debugPrint('WebView Android file picker error: $error');
+    }
+    return <String>[];
   }
 
   NotificationDestination? _destinationFromNativeArguments(Object? arguments) {

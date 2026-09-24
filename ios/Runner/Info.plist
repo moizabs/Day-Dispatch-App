@@ -66,5 +66,54 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+
+	<!-- File Upload & Media Permissions -->
+	<key>NSCameraUsageDescription</key>
+	<string>Day Dispatch requires camera access to take and upload photos of vehicles, bills of lading, proof of delivery, and condition inspection reports directly within the app.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Day Dispatch requires access to your photo library to select and upload vehicle photos, bill of lading (BOL) documents, inspection reports, and dispatch files.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Day Dispatch requires permission to save vehicle inspection photos, dispatch receipts, and documents to your photo library.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Day Dispatch requires microphone access if you record video documentation with audio for vehicle condition or inspection reports.</string>
+
+	<!-- Document Handling Support -->
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UIFileSharingEnabled</key>
+	<false/>
+
+	<!-- Push Notification & Background Modes -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<true/>
+
+	<!-- App Transport Security for WebView -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+	</dict>
+
+	<!-- App Store Export Compliance -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+
+	<!-- External URL Schemes for Communication -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tel</string>
+		<string>mailto</string>
+		<string>sms</string>
+		<string>whatsapp</string>
+		<string>https</string>
+		<string>http</string>
+	</array>
 </dict>
 </plist>
