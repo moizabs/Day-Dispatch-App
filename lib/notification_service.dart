@@ -219,6 +219,17 @@ class NotificationService {
         return false;
       }
 
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+        int attempts = 0;
+        while (apnsToken == null && attempts < 10) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+          attempts++;
+        }
+        debugPrint('APNs token available: ${apnsToken != null && apnsToken.isNotEmpty}');
+      }
+
       final fcmToken = await FirebaseMessaging.instance.getToken();
       debugPrint(
         'Firebase messaging token available: '
