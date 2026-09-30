@@ -45,7 +45,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '625358424286',
     projectId: 'daydispatch-4e285',
     storageBucket: 'daydispatch-4e285.firebasestorage.app',
-    iosBundleId: 'com.example.daydispatch',
+    iosBundleId: 'com.daydispatch.app',
   );
 
   static const FirebaseOptions macos = ios;
