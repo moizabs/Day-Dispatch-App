@@ -7,7 +7,7 @@ import Foundation
 
 import connectivity_plus
 import device_info_plus
-import file_picker_darwin
+import file_picker
 import firebase_core
 import firebase_messaging
 import flutter_local_notifications

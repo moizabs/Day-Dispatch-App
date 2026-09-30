@@ -529,13 +529,22 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
       }
 
       if (allowMultiple) {
-        final files = await FilePicker.pickFiles(type: fileType);
-        return files
-            .where((file) => file.path != null)
-            .map((file) => Uri.file(file.path!).toString())
-            .toList();
+        final result = await FilePicker.platform.pickFiles(
+          type: fileType,
+          allowMultiple: true,
+        );
+        if (result != null) {
+          return result.files
+              .where((file) => file.path != null)
+              .map((file) => Uri.file(file.path!).toString())
+              .toList();
+        }
       } else {
-        final file = await FilePicker.pickFile(type: fileType);
+        final result = await FilePicker.platform.pickFiles(
+          type: fileType,
+          allowMultiple: false,
+        );
+        final file = result?.files.isNotEmpty == true ? result!.files.first : null;
         if (file?.path != null) {
           return [Uri.file(file!.path!).toString()];
         }
