@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import 'firebase_options.dart';
 import 'notification_service.dart';
 
@@ -21,13 +22,16 @@ const Color kDayDispatchSurface = Color(0xFFF7F8FB);
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  // SystemChrome.setSystemUIOverlayStyle(
-  //   const SystemUiOverlayStyle(
-  //     statusBarColor: Colors.transparent,
-  //     statusBarIconBrightness: Brightness.dark,
-  //     statusBarBrightness: Brightness.light,
-  //   ),
-  // );
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.white,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarDividerColor: Colors.transparent,
+    ),
+  );
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await NotificationService.instance.initialize();
   runApp(const DayDispatchApp());
@@ -94,30 +98,50 @@ class _DayDispatchAppState extends State<DayDispatchApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp( 
-      title: 'DayDispatch',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: kDayDispatchSurface,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: kDayDispatchNavy,
-          primary: kDayDispatchNavy,
-          secondary: kDayDispatchRed,
-          brightness: Brightness.light,
-        ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.white,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarDividerColor: Colors.transparent,
       ),
-      home: Stack(
-        children: [
-          DayDispatchWebViewPage(onWebViewReady: _handleWebViewReady),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 900),
-            switchOutCurve: Curves.easeInOutCubic,
-            child: _showSplash
-                ? const DayDispatchSplashScreen(key: ValueKey('splash'))
-                : const SizedBox.shrink(key: ValueKey('content')),
+      child: MaterialApp(
+        title: 'DayDispatch',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true,
+          scaffoldBackgroundColor: Colors.white,
+          appBarTheme: const AppBarTheme(
+            systemOverlayStyle: SystemUiOverlayStyle(
+              statusBarColor: Colors.white,
+              statusBarIconBrightness: Brightness.dark,
+              statusBarBrightness: Brightness.light,
+              systemNavigationBarColor: Colors.white,
+              systemNavigationBarIconBrightness: Brightness.dark,
+              systemNavigationBarDividerColor: Colors.transparent,
+            ),
           ),
-        ],
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: kDayDispatchNavy,
+            primary: kDayDispatchNavy,
+            secondary: kDayDispatchRed,
+            brightness: Brightness.light,
+          ),
+        ),
+        home: Stack(
+          children: [
+            DayDispatchWebViewPage(onWebViewReady: _handleWebViewReady),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 900),
+              switchOutCurve: Curves.easeInOutCubic,
+              child: _showSplash
+                  ? const DayDispatchSplashScreen(key: ValueKey('splash'))
+                  : const SizedBox.shrink(key: ValueKey('content')),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -478,6 +502,10 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
       (_controller.platform as AndroidWebViewController)
           .setOnShowFileSelector(_androidFilePicker);
     }
+    if (_controller.platform is WebKitWebViewController) {
+      (_controller.platform as WebKitWebViewController)
+          .setAllowsBackForwardNavigationGestures(true);
+    }
 
     _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
       results,
@@ -826,16 +854,25 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        if (await _controller.canGoBack()) {
-          await _controller.goBack();
-          return;
-        }
-      },
-      child: Scaffold(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.white,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarDividerColor: Colors.transparent,
+      ),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) async {
+          if (didPop) return;
+          if (await _controller.canGoBack()) {
+            await _controller.goBack();
+            return;
+          }
+        },
+        child: Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(
           top: true,
@@ -1047,6 +1084,8 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
+}
+
