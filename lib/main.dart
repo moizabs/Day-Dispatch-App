@@ -12,9 +12,9 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import 'firebase_options.dart';
 import 'notification_service.dart';
+import 'features/vin_scanner/vin_scanner_screen.dart';
 
-const String kDayDispatchUrl =
-    'https://daydispatch.com/Authentication/Login-Form';
+const String kDayDispatchUrl = 'https://www.daydispatch.com/Authentication/Login-Form';
 const Color kDayDispatchRed = Color(0xFFE01F26);
 const Color kDayDispatchNavy = Color(0xFF1F2E63);
 const Color kDayDispatchSurface = Color(0xFFF7F8FB);
@@ -419,6 +419,15 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
           unawaited(_handleAuthenticationMessage(message.message));
         },
       )
+      ..addJavaScriptChannel(
+        'VinScanner',
+        onMessageReceived: (message) {
+          debugPrint('VinScanner channel message received: ${message.message}');
+          if (message.message == 'scan') {
+            unawaited(_openVinScanner());
+          }
+        },
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (int progress) {
@@ -701,6 +710,38 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
       'window.dispatchEvent(new CustomEvent(${jsonEncode(eventName)}, '
       '{detail: {success: $success}}));',
     );
+  }
+
+  Future<void> _openVinScanner() async {
+    if (!mounted) return;
+    try {
+      final scannedVin = await VinScannerScreen.start(context);
+      if (!mounted) return;
+      if (scannedVin != null && scannedVin.isNotEmpty) {
+        debugPrint('Returning scanned VIN to web: $scannedVin');
+        await _returnScannedVinToWeb(scannedVin);
+      } else {
+        debugPrint('VIN scanner closed without selection.');
+      }
+    } catch (error) {
+      debugPrint('Error while opening VIN scanner: $error');
+    }
+  }
+
+  Future<void> _returnScannedVinToWeb(String vin) async {
+    try {
+      final safeVin = vin
+          .replaceAll(r'\', r'\\')
+          .replaceAll("'", r"\'");
+
+      await _controller.runJavaScript("""
+        if (typeof window.receiveScannedVin === 'function') {
+            window.receiveScannedVin('$safeVin');
+        }
+      """);
+    } catch (error) {
+      debugPrint('Failed to return scanned VIN to WebView: $error');
+    }
   }
 
   bool _isTrustedAppUri(Uri uri) {

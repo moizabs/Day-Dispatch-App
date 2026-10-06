@@ -73,7 +73,7 @@
 
 	<!-- File Upload & Media Permissions -->
 	<key>NSCameraUsageDescription</key>
-	<string>Day Dispatch requires camera access to take and upload photos of vehicles, bills of lading, proof of delivery, and condition inspection reports directly within the app.</string>
+	<string>DayDispatch uses the camera to scan vehicle VIN numbers.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Day Dispatch requires access to your photo library to select and upload vehicle photos, bill of lading (BOL) documents, inspection reports, and dispatch files.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
