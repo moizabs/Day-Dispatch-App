@@ -7,9 +7,28 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:625358424286:android:63e76d94beade61f27da4f",
+        "mobilesdk_app_id": "1:625358424286:android:0a875845d1476b8a27da4f",
         "android_client_info": {
-          "package_name": "com.example.daydispatch"
+          "package_name": "com.daydispatch.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqpU1hSxsSsXT0ib8_k6uEFgOSC2lTMMQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:625358424286:android:09940af548d5624427da4f",
+        "android_client_info": {
+          "package_name": "com.daydispatch.example.daydispatch"
         }
       },
       "oauth_client": [],

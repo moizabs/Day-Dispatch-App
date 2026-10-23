@@ -1,12 +1,10 @@
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart'
-    show TargetPlatform, defaultTargetPlatform, kIsWeb;
+import 'package:flutter/foundation.dart';
 
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
-    if (kIsWeb) {
-      return web;
-    }
+    if (kIsWeb) return web;
+
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
@@ -17,14 +15,9 @@ class DefaultFirebaseOptions {
       case TargetPlatform.windows:
         return windows;
       case TargetPlatform.linux:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        throw UnsupportedError('Firebase has not been configured for Linux.');
       default:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions are not supported for this platform.',
-        );
+        throw UnsupportedError('Firebase is not supported on this platform.');
     }
   }
 
@@ -40,7 +33,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyAqpU1hSxsSsXT0ib8_k6uEFgOSC2lTMMQ',
-    appId: '1:625358424286:android:63e76d94beade61f27da4f',
+    appId: '1:625358424286:android:0a875845d1476b8a27da4f',
     messagingSenderId: '625358424286',
     projectId: 'daydispatch-4e285',
     storageBucket: 'daydispatch-4e285.firebasestorage.app',
@@ -52,7 +45,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '625358424286',
     projectId: 'daydispatch-4e285',
     storageBucket: 'daydispatch-4e285.firebasestorage.app',
-    iosBundleId: 'com.example.daydispatch',
+    iosBundleId: 'com.daydispatch.app',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(

@@ -1,6 +1,6 @@
 # daydispatch
 
-A Web View App
+A new Flutter project.
 
 ## Getting Started
 
