@@ -12,10 +12,13 @@ workflows:
     scripts:
       - name: Install Flutter dependencies
         script: |
+          set -e
+          flutter clean
           flutter pub get
 
       - name: Build iOS Simulator app
         script: |
+          set -e
           flutter build ios --simulator --debug
 
       - name: Package for Appetize
