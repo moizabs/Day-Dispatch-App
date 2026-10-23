@@ -12,20 +12,34 @@ workflows:
     scripts:
       - name: Install Flutter dependencies
         script: |
-          set -e
+          set -euo pipefail
+          git rev-parse HEAD
+          flutter --version
           flutter clean
+          (cd ios && pod deintegrate)
           flutter pub get
+
+      - name: Prepare iOS CocoaPods workspace
+        script: |
+          set -euo pipefail
+          mkdir -p build/ci-logs
+          flutter build ios --simulator --debug --config-only --verbose 2>&1 | tee build/ci-logs/ios-prepare.log
+          test -f ios/Pods/Pods.xcodeproj/project.pbxproj
+          test -f "ios/Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
+          grep -q 'Pods/Pods.xcodeproj' ios/Runner.xcworkspace/contents.xcworkspacedata
 
       - name: Build iOS Simulator app
         script: |
-          set -e
-          flutter build ios --simulator --debug
+          set -euo pipefail
+          flutter build ios --simulator --debug --verbose 2>&1 | tee build/ci-logs/ios-build.log
 
       - name: Package for Appetize
         script: |
+          set -euo pipefail
           cd build/ios/iphonesimulator
           zip -r "$CM_BUILD_DIR/Runner-simulator.zip" Runner.app
 
     artifacts:
+      - build/ci-logs/*.log
       - Runner-simulator.zip
       - build/ios/iphonesimulator/Runner.app
