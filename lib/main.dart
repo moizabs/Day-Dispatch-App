@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -10,7 +11,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
+
 import 'firebase_options.dart';
+import 'account_browser.dart';
 import 'notification_service.dart';
 import 'features/vin_scanner/vin_scanner_screen.dart';
 
@@ -274,7 +277,7 @@ class _DayDispatchSplashScreenState extends State<DayDispatchSplashScreen>
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(19),
                                 child: Image.asset(
-                                  'assets/images/daydispatch_logo.webp',
+                                  'assets/branding/daydispatch_logo.webp',
                                   fit: BoxFit.contain,
                                   errorBuilder: (_, _, _) => const Icon(
                                     Icons.local_shipping_rounded,
@@ -413,6 +416,26 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
         'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1 DayDispatchApp/1.0',
       )
       ..addJavaScriptChannel(
+        'DayDispatchBrowser',
+        onMessageReceived: (message) async {
+          final current = Uri.tryParse(await _controller.currentUrl() ?? '');
+          if (current == null || !isDayDispatchUrl(current)) return;
+          try {
+            final data = jsonDecode(message.message) as Map<String, dynamic>;
+            final id = data['id'];
+            final uri = Uri.tryParse(data['url'] as String);
+            if (id is! int || uri == null) return;
+            final opened = await _openExternal(uri);
+            await _controller.runJavaScript(
+              'window.dispatchEvent(new CustomEvent("daydispatch:browser-result", '
+              '{detail: {id: $id, opened: $opened}}));',
+            );
+          } catch (_) {
+            // Ignore malformed bridge messages from page scripts.
+          }
+        },
+      )
+      ..addJavaScriptChannel(
         'DayDispatchAuth',
         onMessageReceived: (message) {
           debugPrint('DayDispatch authentication channel message received.');
@@ -453,7 +476,13 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
               _offline = false;
             });
           },
-          onPageFinished: (String url) {
+          onPageFinished: (String url) async {
+            if (!mounted) return;
+            final pageUri = Uri.tryParse(url);
+            if (pageUri != null && isDayDispatchUrl(pageUri)) {
+              await _controller.runJavaScript(_browserBridge);
+            }
+            if (!mounted) return;
             _webViewReady = true;
             setState(() {
               _loading = false;
@@ -482,9 +511,13 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
               _pullDistance = 0;
             });
           },
-          onNavigationRequest: (NavigationRequest request) {
+          onNavigationRequest: (NavigationRequest request) async {
             final uri = Uri.tryParse(request.url);
             if (uri == null) return NavigationDecision.prevent;
+            if (request.isMainFrame && isExternalAccountPage(uri)) {
+              await _openExternal(uri);
+              return NavigationDecision.prevent;
+            }
 
             const externalSchemes = {'tel', 'mailto', 'sms', 'whatsapp'};
             if (externalSchemes.contains(uri.scheme.toLowerCase())) {
@@ -492,8 +525,7 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
               return NavigationDecision.prevent;
             }
 
-            // Keep website, authentication, payment, and redirect pages inside
-            // the app instead of unexpectedly switching to Chrome.
+            // Keep other website and redirect pages inside the app.
             if (uri.scheme == 'http' ||
                 uri.scheme == 'https' ||
                 uri.scheme == 'about' ||
@@ -508,8 +540,9 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
       );
 
     if (_controller.platform is AndroidWebViewController) {
-      (_controller.platform as AndroidWebViewController)
-          .setOnShowFileSelector(_androidFilePicker);
+      (_controller.platform as AndroidWebViewController).setOnShowFileSelector(
+        _androidFilePicker,
+      );
     }
     if (_controller.platform is WebKitWebViewController) {
       (_controller.platform as WebKitWebViewController)
@@ -529,6 +562,52 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
 
     unawaited(_initializeWebView());
   }
+
+  Future<bool> _openExternal(Uri uri) async {
+    if (!isExternalAccountPage(uri)) return false;
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        return true;
+      }
+    } catch (_) {
+      // Keep the current WebView page and offer a retry on launch failure.
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Could not open your browser. Please try again.'),
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () => _openExternal(uri),
+          ),
+        ),
+      );
+    }
+    return false;
+  }
+
+  static const _browserBridge = r'''
+    (() => {
+      if (window.dayDispatchNative?.openExternal) return;
+      let nextId = 0;
+      window.dayDispatchNative = window.dayDispatchNative || {};
+      window.dayDispatchNative.openExternal = (url) => new Promise((resolve) => {
+        const id = ++nextId;
+        const finish = (opened) => {
+          clearTimeout(timer);
+          window.removeEventListener('daydispatch:browser-result', handler);
+          resolve(opened);
+        };
+        const handler = (event) => {
+          if (event.detail?.id === id) finish(event.detail.opened === true);
+        };
+        const timer = setTimeout(() => finish(false), 10000);
+        window.addEventListener('daydispatch:browser-result', handler);
+        DayDispatchBrowser.postMessage(JSON.stringify({id, url}));
+      });
+      window.dispatchEvent(new Event('daydispatch:native-ready'));
+    })();
+  ''';
 
   Future<void> _initializeNativeNotificationNavigation() async {
     _nativeNotificationChannel.setMethodCallHandler((call) async {
@@ -581,7 +660,9 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
           type: fileType,
           allowMultiple: false,
         );
-        final file = result?.files.isNotEmpty == true ? result!.files.first : null;
+        final file = result?.files.isNotEmpty == true
+            ? result!.files.first
+            : null;
         if (file?.path != null) {
           return [Uri.file(file!.path!).toString()];
         }
@@ -832,8 +913,7 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
     Size size,
   ) async {
     try {
-      final result = await _controller.runJavaScriptReturningResult(
-        '''
+      final result = await _controller.runJavaScriptReturningResult('''
         (() => {
           const x = ${position.dx / size.width} * window.innerWidth;
           const y = ${position.dy / size.height} * window.innerHeight;
@@ -854,8 +934,7 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
           return Math.max(document.documentElement.scrollTop || 0,
                           document.body.scrollTop || 0) <= 1;
         })()
-        ''',
-      );
+        ''');
       if (mounted && _pullPointer == pointer) {
         _canPullToRefresh = result == true || result.toString() == 'true';
       }
@@ -914,219 +993,219 @@ class _DayDispatchWebViewPageState extends State<DayDispatchWebViewPage> {
           }
         },
         child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          top: true,
-          bottom: false,
-          child: Stack(
-            children: [
-              if (!_offline)
-                Listener(
-                  key: _webViewGestureKey,
-                  onPointerDown: _startPull,
-                  onPointerMove: _updatePull,
-                  onPointerUp: _finishPull,
-                  onPointerCancel: _finishPull,
-                  child: WebViewWidget(controller: _controller),
-                ),
-              if (!_offline && (_pullDistance > 0 || _refreshing))
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutBack,
-                  top: _refreshing ? 18 : 8,
-                  left: 0,
-                  right: 0,
-                  child: IgnorePointer(
-                    child: Center(
-                      child: Transform.translate(
-                        offset: Offset(
-                          0,
-                          (_pullDistance - 44).clamp(0, 70).toDouble(),
-                        ),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 9,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(22),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x26000000),
-                                blurRadius: 12,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: _refreshing
-                                    ? const CircularProgressIndicator(
-                                        strokeWidth: 2.4,
-                                        color: kDayDispatchRed,
-                                      )
-                                    : Transform.rotate(
-                                        angle:
-                                            (_pullDistance /
-                                                _refreshTriggerDistance) *
-                                            3.14159,
-                                        child: CircularProgressIndicator(
-                                          value: (_pullDistance /
-                                                  _refreshTriggerDistance)
-                                              .clamp(0.0, 1.0),
-                                          strokeWidth: 2.4,
-                                          color: kDayDispatchRed,
-                                          backgroundColor: kDayDispatchRed
-                                              .withValues(alpha: 0.12),
-                                        ),
-                                      ),
-                              ),
-                              const SizedBox(width: 9),
-                              AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 180),
-                                child: Text(
-                                  _refreshing
-                                      ? 'Refreshing...'
-                                      : _pullDistance >=
-                                            _refreshTriggerDistance
-                                      ? 'Release to refresh'
-                                      : 'Pull to refresh',
-                                  key: ValueKey(
-                                    _refreshing
-                                        ? 'refreshing'
-                                        : _pullDistance >=
-                                              _refreshTriggerDistance
-                                        ? 'release'
-                                        : 'pull',
-                                  ),
-                                  style: const TextStyle(
-                                    color: kDayDispatchNavy,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            top: true,
+            bottom: false,
+            child: Stack(
+              children: [
+                if (!_offline)
+                  Listener(
+                    key: _webViewGestureKey,
+                    onPointerDown: _startPull,
+                    onPointerMove: _updatePull,
+                    onPointerUp: _finishPull,
+                    onPointerCancel: _finishPull,
+                    child: WebViewWidget(controller: _controller),
                   ),
-                ),
-              if (_offline)
-                Container(
-                  color: kDayDispatchSurface,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 36),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 92,
-                            height: 92,
+                if (!_offline && (_pullDistance > 0 || _refreshing))
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutBack,
+                    top: _refreshing ? 18 : 8,
+                    left: 0,
+                    right: 0,
+                    child: IgnorePointer(
+                      child: Center(
+                        child: Transform.translate(
+                          offset: Offset(
+                            0,
+                            (_pullDistance - 44).clamp(0, 70).toDouble(),
+                          ),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOutCubic,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 9,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(28),
-                              boxShadow: [
+                              borderRadius: BorderRadius.circular(22),
+                              boxShadow: const [
                                 BoxShadow(
-                                  color: kDayDispatchNavy.withValues(
-                                    alpha: 0.08,
-                                  ),
-                                  blurRadius: 18,
-                                  offset: const Offset(0, 10),
+                                  color: Color(0x26000000),
+                                  blurRadius: 12,
+                                  offset: Offset(0, 4),
                                 ),
                               ],
                             ),
-                            child: const Icon(
-                              Icons.wifi_off_rounded,
-                              size: 46,
-                              color: kDayDispatchRed,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: _refreshing
+                                      ? const CircularProgressIndicator(
+                                          strokeWidth: 2.4,
+                                          color: kDayDispatchRed,
+                                        )
+                                      : Transform.rotate(
+                                          angle:
+                                              (_pullDistance /
+                                                  _refreshTriggerDistance) *
+                                              3.14159,
+                                          child: CircularProgressIndicator(
+                                            value:
+                                                (_pullDistance /
+                                                        _refreshTriggerDistance)
+                                                    .clamp(0.0, 1.0),
+                                            strokeWidth: 2.4,
+                                            color: kDayDispatchRed,
+                                            backgroundColor: kDayDispatchRed
+                                                .withValues(alpha: 0.12),
+                                          ),
+                                        ),
+                                ),
+                                const SizedBox(width: 9),
+                                AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 180),
+                                  child: Text(
+                                    _refreshing
+                                        ? 'Refreshing...'
+                                        : _pullDistance >=
+                                              _refreshTriggerDistance
+                                        ? 'Release to refresh'
+                                        : 'Pull to refresh',
+                                    key: ValueKey(
+                                      _refreshing
+                                          ? 'refreshing'
+                                          : _pullDistance >=
+                                                _refreshTriggerDistance
+                                          ? 'release'
+                                          : 'pull',
+                                    ),
+                                    style: const TextStyle(
+                                      color: kDayDispatchNavy,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 24),
-                          const Text(
-                            'Internet connection unavailable',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                              color: kDayDispatchNavy,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Check your network and try again to continue using DayDispatch.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 15,
-                              height: 1.5,
-                              color: Color(0xFF4D597C),
-                            ),
-                          ),
-                          const SizedBox(height: 28),
-                          ElevatedButton.icon(
-                            onPressed: _retryLoad,
-                            icon: const Icon(Icons.refresh_rounded),
-                            label: const Text('Retry'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: kDayDispatchRed,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 14,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              if (!_offline)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: AnimatedOpacity(
-                    opacity: _loading ? 1 : 0,
-                    duration: const Duration(milliseconds: 450),
-                    curve: Curves.easeOutCubic,
-                    child: IgnorePointer(
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: _progress / 100),
-                        duration: const Duration(milliseconds: 500),
-                        curve: Curves.easeOutCubic,
-                        builder: (context, value, child) =>
-                            LinearProgressIndicator(
-                              value: value,
-                              minHeight: 3,
-                              backgroundColor: kDayDispatchRed.withValues(
-                                alpha: 0.08,
+                if (_offline)
+                  Container(
+                    color: kDayDispatchSurface,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 36),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 92,
+                              height: 92,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(28),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: kDayDispatchNavy.withValues(
+                                      alpha: 0.08,
+                                    ),
+                                    blurRadius: 18,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
                               ),
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                kDayDispatchRed,
+                              child: const Icon(
+                                Icons.wifi_off_rounded,
+                                size: 46,
+                                color: kDayDispatchRed,
                               ),
                             ),
+                            const SizedBox(height: 24),
+                            const Text(
+                              'Internet connection unavailable',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                                color: kDayDispatchNavy,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Check your network and try again to continue using DayDispatch.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 15,
+                                height: 1.5,
+                                color: Color(0xFF4D597C),
+                              ),
+                            ),
+                            const SizedBox(height: 28),
+                            ElevatedButton.icon(
+                              onPressed: _retryLoad,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('Retry'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kDayDispatchRed,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+                if (!_offline)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: AnimatedOpacity(
+                      opacity: _loading ? 1 : 0,
+                      duration: const Duration(milliseconds: 450),
+                      curve: Curves.easeOutCubic,
+                      child: IgnorePointer(
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0, end: _progress / 100),
+                          duration: const Duration(milliseconds: 500),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, value, child) =>
+                              LinearProgressIndicator(
+                                value: value,
+                                minHeight: 3,
+                                backgroundColor: kDayDispatchRed.withValues(
+                                  alpha: 0.08,
+                                ),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  kDayDispatchRed,
+                                ),
+                              ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
-}
-

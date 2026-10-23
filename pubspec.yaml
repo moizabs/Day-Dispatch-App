@@ -38,7 +38,7 @@ dependencies:
   webview_flutter_android: ^4.10.0
   webview_flutter_wkwebview: ^3.26.1
   connectivity_plus: ^6.1.1
-  url_launcher: ^6.3.2
+  url_launcher: ^6.3.3
   firebase_core: ^4.14.0
   firebase_messaging: ^16.6.0
   flutter_local_notifications: ^22.3.0
@@ -55,7 +55,7 @@ dependencies:
 
 dependency_overrides:
   permission_handler_android: "<14.0.0"
-  
+
 
 dev_dependencies:
   flutter_test:
@@ -65,9 +65,19 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 flutter_launcher_icons:
+  image_path: assets/branding/daydispatch_app_icon.png
   android: true
   ios: true
-  image_path: "assets/icon/app_icon.png"
+  remove_alpha_ios: true
+  web:
+    generate: true
+    background_color: "#FFFFFF"
+    theme_color: "#164B78"
+  windows:
+    generate: true
+    icon_size: 256
+  macos:
+    generate: true
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -86,6 +96,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/branding/daydispatch_logo.webp
     - assets/images/daydispatch_logo.webp
 
   # To add assets to your application, add an assets section, like this:

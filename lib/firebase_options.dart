@@ -48,7 +48,14 @@ class DefaultFirebaseOptions {
     iosBundleId: 'com.daydispatch.app',
   );
 
-  static const FirebaseOptions macos = ios;
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyDgW2cAFZkL_MSjORkHejgZYykgvFFGc80',
+    appId: '1:625358424286:ios:89641dae561fd0c127da4f',
+    messagingSenderId: '625358424286',
+    projectId: 'daydispatch-4e285',
+    storageBucket: 'daydispatch-4e285.firebasestorage.app',
+    iosBundleId: 'com.example.daydispatch',
+  );
 
   static const FirebaseOptions windows = FirebaseOptions(
     apiKey: 'AIzaSyALcIXTfR3Fwgzh9H0Rd0vtJP5eD_enz5E',
